@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>com.styra.opa</groupId>
+  <groupId>org.openpolicyagent</groupId>
   <artifactId>opa-java-wasm-parent</artifactId>
   <version>999-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>OPA Wasm for Java</name>
   <description>Evaluate OPA policies in Wasm using the Endive runtime</description>
-  <url>https://github.com/StyraInc/opa-java-wasm</url>
+  <url>https://github.com/open-policy-agent/opa-java-wasm</url>
 
   <licenses>
     <license>
@@ -31,9 +31,9 @@
   </modules>
 
   <scm child.scm.connection.inherit.append.path="false" child.scm.developerConnection.inherit.append.path="false" child.scm.url.inherit.append.path="false">
-    <connection>scm:git:https://github.com/StyraInc/opa-java-wasm.git</connection>
-    <developerConnection>scm:git@github.com:StyraInc/opa-java-wasm.git</developerConnection>
-    <url>https://github.com/StyraInc/opa-java-wasm.git</url>
+    <connection>scm:git:https://github.com/open-policy-agent/opa-java-wasm.git</connection>
+    <developerConnection>scm:git@github.com:open-policy-agent/opa-java-wasm.git</developerConnection>
+    <url>https://github.com/open-policy-agent/opa-java-wasm.git</url>
   </scm>
 
   <properties>
