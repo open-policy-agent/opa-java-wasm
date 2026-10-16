@@ -32,7 +32,8 @@ public class OpaPolicy {
     private int inputAddr = -1;
     private int entrypoint;
 
-    private OpaPolicy(OpaWasm wasm) {
+    /** Package-private: also used by {@link OpaPolicyFactory}. */
+    OpaPolicy(OpaWasm wasm) {
         this.wasm = wasm;
 
         if (!(wasm.exports().opaWasmAbiVersion().getValue() == 1L

@@ -8,12 +8,15 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import org.openpolicyagent.wasm.builtins.Provided;
 import run.endive.annotations.WasmModuleInterface;
 import run.endive.compiler.MachineFactoryCompiler;
 import run.endive.runtime.Instance;
+import run.endive.runtime.Machine;
 import run.endive.runtime.Memory;
 import run.endive.wasm.Parser;
+import run.endive.wasm.WasmModule;
 
 // Low level bindings to OPA
 @WasmModuleInterface("demo-policy.wasm")
@@ -48,6 +51,36 @@ public class OpaWasm implements OpaWasm_ModuleImports, OpaWasm_Env {
 
         if (enableCompiler) {
             instanceBuilder.withMachineFactory(MachineFactoryCompiler::compile);
+        }
+
+        this.instance = instanceBuilder.build();
+        this.exports = new OpaWasm_ModuleExports(instance);
+        this.builtins = initializeBuiltins(defaultBuiltins, builtins);
+    }
+
+    /**
+     * Package-private: used by {@link OpaPolicyFactory} to instantiate from an already parsed
+     * module and compiled machine factory. A {@code null} machine factory selects the
+     * interpreter. Each instance receives fresh {@link Memory} from the factory.
+     */
+    OpaWasm(
+            WasmModule module,
+            Function<Instance, Machine> machineFactory,
+            ObjectMapper jsonMapper,
+            ObjectMapper yamlMapper,
+            Memory memory,
+            boolean defaultBuiltins,
+            OpaBuiltin.Builtin[] builtins) {
+        this.jsonMapper = jsonMapper;
+        this.yamlMapper = yamlMapper;
+        this.memory = memory;
+        var instanceBuilder =
+                Instance.builder(module)
+                        .withImportValues(toImportValues())
+                        .withMemoryFactory(limits -> memory);
+
+        if (machineFactory != null) {
+            instanceBuilder.withMachineFactory(machineFactory);
         }
 
         this.instance = instanceBuilder.build();
