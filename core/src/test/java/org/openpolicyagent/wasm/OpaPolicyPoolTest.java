@@ -2,9 +2,11 @@ package org.openpolicyagent.wasm;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -16,8 +18,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import run.endive.compiler.MachineFactoryCompiler;
 
 public class OpaPolicyPoolTest {
     static Path wasmFile;
@@ -141,6 +145,103 @@ public class OpaPolicyPoolTest {
             assertTrue(Utils.getResult(loan.policy().evaluate()).asBoolean());
         }
 
+        pool.close();
+    }
+
+    @Test
+    public void factoryBackedPoolCompilesOnceAndKeepsBorrowedPoliciesIsolated() throws Exception {
+        var compilations = new AtomicInteger();
+        var factory =
+                OpaPolicyFactory.builder()
+                        .withPolicy(Files.readAllBytes(wasmFile))
+                        .withCompiler(
+                                module -> {
+                                    compilations.incrementAndGet();
+                                    return MachineFactoryCompiler.compile(module);
+                                })
+                        .build();
+        var pool = OpaPolicyPool.create(factory::newPolicy, 2);
+
+        try (var first = pool.borrow();
+                var second = pool.borrow()) {
+            first.policy().data("{ \"role\" : { \"alice\" : \"admin\" } }");
+            second.policy().data("{ \"role\" : { \"bob\" : \"admin\" } }");
+
+            assertTrue(
+                    Utils.getResult(first.policy().evaluate("{\"user\": \"alice\"}")).asBoolean());
+            assertFalse(
+                    Utils.getResult(second.policy().evaluate("{\"user\": \"alice\"}")).asBoolean());
+            assertFalse(
+                    Utils.getResult(first.policy().evaluate("{\"user\": \"bob\"}")).asBoolean());
+            assertTrue(
+                    Utils.getResult(second.policy().evaluate("{\"user\": \"bob\"}")).asBoolean());
+        }
+
+        assertEquals(1, compilations.get());
+        pool.close();
+    }
+
+    @Test
+    public void factoryBackedPoolResetsPolicyWhenReturned() throws Exception {
+        var compilations = new AtomicInteger();
+        var factory =
+                OpaPolicyFactory.builder()
+                        .withPolicy(Files.readAllBytes(wasmFile))
+                        .withCompiler(
+                                module -> {
+                                    compilations.incrementAndGet();
+                                    return MachineFactoryCompiler.compile(module);
+                                })
+                        .build();
+        var pool = OpaPolicyPool.create(factory::newPolicy, 1);
+
+        try (var loan = pool.borrow()) {
+            loan.policy().data("{ \"role\" : { \"alice\" : \"admin\" } }");
+            assertTrue(
+                    Utils.getResult(loan.policy().evaluate("{\"user\": \"alice\"}")).asBoolean());
+        }
+
+        try (var loan = pool.borrow()) {
+            loan.policy().data("{ \"role\" : { \"bob\" : \"admin\" } }");
+            assertFalse(
+                    Utils.getResult(loan.policy().evaluate("{\"user\": \"alice\"}")).asBoolean());
+            assertTrue(Utils.getResult(loan.policy().evaluate("{\"user\": \"bob\"}")).asBoolean());
+        }
+
+        assertEquals(1, compilations.get());
+        pool.close();
+    }
+
+    @Test
+    public void factoryBackedPoolReplacesDiscardedPolicyWithoutRecompiling() throws Exception {
+        var compilations = new AtomicInteger();
+        var factory =
+                OpaPolicyFactory.builder()
+                        .withPolicy(Files.readAllBytes(wasmFile))
+                        .withCompiler(
+                                module -> {
+                                    compilations.incrementAndGet();
+                                    return MachineFactoryCompiler.compile(module);
+                                })
+                        .build();
+        var pool = OpaPolicyPool.create(factory::newPolicy, 1);
+        OpaPolicy discarded;
+
+        try (var loan = pool.borrow()) {
+            discarded = loan.policy();
+            discarded.data("{ \"role\" : { \"alice\" : \"admin\" } }");
+            loan.discard();
+        }
+
+        try (var loan = pool.borrow()) {
+            assertNotSame(discarded, loan.policy());
+            loan.policy().data("{ \"role\" : { \"bob\" : \"admin\" } }");
+            assertFalse(
+                    Utils.getResult(loan.policy().evaluate("{\"user\": \"alice\"}")).asBoolean());
+            assertTrue(Utils.getResult(loan.policy().evaluate("{\"user\": \"bob\"}")).asBoolean());
+        }
+
+        assertEquals(1, compilations.get());
         pool.close();
     }
 
