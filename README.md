@@ -124,11 +124,16 @@ use.  It uses lock-free data structures internally, so it is safe to use with
 virtual threads (no carrier-thread pinning).
 
 ```java
+import org.openpolicyagent.wasm.OpaPolicyFactory;
 import org.openpolicyagent.wasm.OpaPolicyPool;
 
+var policyFactory = OpaPolicyFactory.builder()
+        .withPolicy(policyWasm)
+        .build(); // parses and compiles the WASM module once
+
 var pool = OpaPolicyPool.create(
-        () -> OpaPolicy.builder().withPolicy(policyWasm).build(),
-        4); // at most 4 concurrent instances
+        policyFactory::newPolicy,
+        4); // at most 4 concurrent, isolated runtime instances
 
 try (var loan = pool.borrow()) {    // blocks if all 4 are in use
     loan.policy()
@@ -143,6 +148,8 @@ pool.close();
 
 Each policy is reset to a clean state when returned to the pool (data, input
 and entrypoint are cleared), so the next borrower always starts fresh.
+Creating or replacing a pooled policy through `OpaPolicyFactory` creates fresh
+WASM memory and evaluation state without recompiling the module.
 
 If a processing error may have left the policy in a bad state, call
 `loan.discard()` instead of letting `close()` return it:
