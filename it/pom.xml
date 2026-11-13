@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>org.openpolicyagent</groupId>
+    <artifactId>opa-java-wasm-parent</artifactId>
+    <version>999-SNAPSHOT</version>
+  </parent>
+  <artifactId>opa-java-wasm-it</artifactId>
+  <name>Java Opa Wasm - IT</name>
+  <description>Policies compiled at build time, set up as a user project would</description>
+
+  <properties>
+    <maven.deploy.skip>true</maven.deploy.skip>
+    <!-- central-publishing-maven-plugin ignores maven.deploy.skip -->
+    <skipPublishing>true</skipPublishing>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.openpolicyagent</groupId>
+      <artifactId>opa-java-wasm</artifactId>
+      <version>${project.version}</version>
+      <exclusions>
+        <!-- not needed with build-time compiled policies -->
+        <exclusion>
+          <groupId>run.endive</groupId>
+          <artifactId>compiler</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-engine</artifactId>
+      <version>${junit.version}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>run.endive</groupId>
+        <artifactId>endive-compiler-maven-plugin</artifactId>
+        <version>${endive.version}</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>compile</goal>
+            </goals>
+            <configuration>
+              <wasmFile>../core/src/main/resources/demo-policy.wasm</wasmFile>
+              <name>org.openpolicyagent.wasm.it.DemoPolicy</name>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>
