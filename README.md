@@ -169,6 +169,37 @@ try (var loan = pool.borrow()) {
 > **Note:** A single `OpaPolicy` instance is **not thread-safe**.
 > Without the pool, use one instance per thread.
 
+## Build-time compiled policies
+
+Policies can be compiled to JVM bytecode at build time with the
+[Endive build-time compiler](https://endive.run/docs/execution/build-time-compiler),
+so they ship as plain classes in a jar and skip parsing and compilation at runtime:
+
+```xml
+<plugin>
+  <groupId>run.endive</groupId>
+  <artifactId>endive-compiler-maven-plugin</artifactId>
+  <version>${endive.version}</version>
+  <executions>
+    <execution>
+      <goals>
+        <goal>compile</goal>
+      </goals>
+      <configuration>
+        <wasmFile>target/policy.wasm</wasmFile>
+        <name>org.acme.Policy</name>
+      </configuration>
+    </execution>
+  </executions>
+</plugin>
+```
+
+Then pass the generated module and machine factory:
+`OpaPolicyFactory.builder().withPolicy(Policy.load()).withMachineFactory(Policy::create).build()`.
+
+Use the same Endive version as `opa-java-wasm`. When all policies are compiled at build time,
+`run.endive:compiler` (and ASM) can be excluded; see [`it/pom.xml`](it/pom.xml) for a complete setup.
+
 ## Builtins support:
 
 At the moment the following builtins are supported(and, by default, automatically injected when needed):

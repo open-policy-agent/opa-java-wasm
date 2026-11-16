@@ -51,8 +51,17 @@ public final class OpaPolicyFactory {
     private final OpaBuiltin.Builtin[] builtins;
 
     private OpaPolicyFactory(Builder b) {
-        module = Parser.parse(b.policy);
-        machineFactory = b.enableCompiler ? b.compiler.apply(module) : null;
+        module = b.module != null ? b.module : Parser.parse(b.policy);
+        if (b.machineFactory != null) {
+            machineFactory = b.machineFactory;
+        } else if (!b.enableCompiler) {
+            machineFactory = null;
+        } else if (b.compiler != null) {
+            machineFactory = b.compiler.apply(module);
+        } else {
+            // only links the runtime compiler when it is actually used
+            machineFactory = MachineFactoryCompiler.compile(module);
+        }
         jsonMapper = b.jsonMapper != null ? b.jsonMapper : DefaultMappers.jsonMapper;
         yamlMapper = b.yamlMapper != null ? b.yamlMapper : DefaultMappers.yamlMapper;
         initialMemory = b.initialMemory;
@@ -86,6 +95,8 @@ public final class OpaPolicyFactory {
     public static final class Builder {
 
         private InputStream policy;
+        private WasmModule module;
+        private Function<Instance, Machine> machineFactory;
         private ObjectMapper jsonMapper;
         private ObjectMapper yamlMapper;
         private int initialMemory = 10;
@@ -93,18 +104,33 @@ public final class OpaPolicyFactory {
         private boolean defaultBuiltins = true;
         private boolean enableCompiler = true;
         private final List<OpaBuiltin.Builtin> builtins = new ArrayList<>();
-        private Function<WasmModule, Function<Instance, Machine>> compiler =
-                MachineFactoryCompiler::compile;
+        private Function<WasmModule, Function<Instance, Machine>> compiler;
 
         private Builder() {}
 
         public Builder withPolicy(byte[] bytes) {
-            policy = new ByteArrayInputStream(bytes.clone());
-            return this;
+            return withPolicy(new ByteArrayInputStream(bytes.clone()));
         }
 
         public Builder withPolicy(InputStream input) {
             policy = input;
+            module = null;
+            return this;
+        }
+
+        /**
+         * Uses an already parsed module. A module from the build-time compiler ({@code
+         * Policy.load()}) has no function bodies: pair it with {@code withMachineFactory(Policy::create)}.
+         */
+        public Builder withPolicy(WasmModule value) {
+            module = value;
+            policy = null;
+            return this;
+        }
+
+        /** Skips runtime compilation, e.g. {@code Policy::create} from the build-time compiler. */
+        public Builder withMachineFactory(Function<Instance, Machine> value) {
+            machineFactory = value;
             return this;
         }
 
@@ -149,9 +175,14 @@ public final class OpaPolicyFactory {
             return this;
         }
 
-        /** Parses and compiles the policy. Invalid modules fail here, before any evaluation. */
+        /**
+         * Parses and compiles the policy, unless already done at build time. Invalid modules fail
+         * here, before any evaluation.
+         */
         public OpaPolicyFactory build() {
-            Objects.requireNonNull(policy, "policy");
+            if (module == null) {
+                Objects.requireNonNull(policy, "policy");
+            }
             return new OpaPolicyFactory(this);
         }
     }
